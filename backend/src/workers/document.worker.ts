@@ -53,7 +53,7 @@ async function processDocument(
 
   // ── Step 2: Parse document to plain text ─────────────────────────────────
   await job.updateProgress(30);
-  const text = await parseDocument(content, contentType);
+  const text = await parseDocument(content, contentType, filename);
   console.log(`[Worker] Parsed text length: ${text.length} chars`);
 
   if (!text.trim()) {

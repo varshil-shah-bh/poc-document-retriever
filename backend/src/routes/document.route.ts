@@ -11,15 +11,20 @@ const upload = multer({
   dest: join(tmpdir(), 'rag-uploads'),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
   fileFilter: (_req, file, cb) => {
+    // Allow octet-stream — the parser uses magic bytes + filename extension to
+    // detect the real type, so an incorrect Content-Type is not a problem here.
     const allowed = new Set([
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/msword',
+      'application/octet-stream', // generic binary — detected by magic bytes
       'text/plain',
       'text/markdown',
       'text/csv',
     ]);
-    if (allowed.has(file.mimetype) || file.mimetype.startsWith('text/')) {
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    const allowedExts = new Set(['pdf', 'docx', 'doc', 'txt', 'md', 'csv']);
+    if (allowed.has(file.mimetype) || file.mimetype.startsWith('text/') || allowedExts.has(ext ?? '')) {
       cb(null, true);
     } else {
       cb(new Error('Unsupported file type. Allowed: PDF, DOCX, DOC, TXT, MD, CSV.'));

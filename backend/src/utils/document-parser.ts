@@ -9,24 +9,63 @@ const require = createRequire(import.meta.url);
 /**
  * Parses raw document bytes into clean, readable plain text.
  *
+ * Type detection priority (most → least reliable):
+ *  1. Magic bytes   — immune to wrong/missing Content-Type headers
+ *  2. File extension from the filename
+ *  3. Content-Type  header (last resort; often "application/octet-stream")
+ *
  * PDF  → pdfjs-dist  (renders actual page text; avoids the raw object-stream
  *                     garbage that pdf-parse emits for tagged/structured PDFs)
  * DOCX → mammoth
  * TXT  → UTF-8 decode
  */
-export async function parseDocument(content: Buffer, contentType: string): Promise<string> {
-  const ext = resolveExtension(contentType);
+export async function parseDocument(
+  content: Buffer,
+  contentType: string,
+  filename?: string,
+): Promise<string> {
+  const ext = detectFileType(content, contentType, filename);
 
-  if (ext === '.pdf') {
-    return parsePDF(content);
-  }
-
-  if (ext === '.docx') {
-    return parseDocx(content);
-  }
-
-  // Plain text / Markdown / CSV
+  if (ext === '.pdf') return parsePDF(content);
+  if (ext === '.docx') return parseDocx(content);
   return content.toString('utf-8');
+}
+
+// ── File-type detection ───────────────────────────────────────────────────────
+
+/**
+ * Determines the canonical extension using magic bytes first, then filename,
+ * then Content-Type.  Returns '.pdf', '.docx', or '.txt'.
+ */
+function detectFileType(content: Buffer, contentType: string, filename?: string): string {
+  // ── 1. Magic bytes ────────────────────────────────────────────────────────
+  // PDF: starts with "%PDF"
+  if (content.length >= 4 && content.slice(0, 4).toString('ascii') === '%PDF') {
+    return '.pdf';
+  }
+  // DOCX / ZIP: PK\x03\x04 signature (Office Open XML is a ZIP archive)
+  if (
+    content.length >= 4 &&
+    content[0] === 0x50 && content[1] === 0x4b &&
+    content[2] === 0x03 && content[3] === 0x04
+  ) {
+    return '.docx';
+  }
+
+  // ── 2. Filename extension ─────────────────────────────────────────────────
+  if (filename) {
+    const ext = filename.split('.').pop()?.toLowerCase();
+    if (ext === 'pdf')              return '.pdf';
+    if (ext === 'docx' || ext === 'doc') return '.docx';
+    if (ext === 'txt' || ext === 'md' || ext === 'csv') return '.txt';
+  }
+
+  // ── 3. Content-Type header ────────────────────────────────────────────────
+  const ct = contentType.toLowerCase();
+  if (ct.includes('pdf'))                                             return '.pdf';
+  if (ct.includes('wordprocessingml') || ct.includes('msword'))       return '.docx';
+
+  return '.txt';
 }
 
 // ── PDF via pdfjs-dist ────────────────────────────────────────────────────────
@@ -89,14 +128,6 @@ async function parseDocx(content: Buffer): Promise<string> {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function resolveExtension(contentType: string): string {
-  const ct = contentType.toLowerCase();
-  if (ct.includes('pdf')) return '.pdf';
-  if (ct.includes('wordprocessingml') || ct.includes('docx') || ct.includes('msword'))
-    return '.docx';
-  return '.txt';
-}
 
 /**
  * Strips residual PDF internal syntax that occasionally leaks through parsers
