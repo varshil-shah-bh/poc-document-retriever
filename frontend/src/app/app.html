@@ -1,0 +1,98 @@
+<div class="chat-shell">
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header class="chat-header">
+    <div class="chat-header-inner">
+      <div class="header-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="header-title">Document Assistant</h1>
+        <p class="header-subtitle">Ask questions about your indexed documents</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Messages ───────────────────────────────────────────────────── -->
+  <div #messagesContainer class="messages-area">
+    @if (messages().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </div>
+        <p class="empty-title">Ready to answer your questions</p>
+        <p class="empty-hint">Type a question below to search your indexed documents.</p>
+      </div>
+    }
+
+    @for (msg of messages(); track $index) {
+      @if (msg.role === 'user') {
+        <div class="row row-user">
+          <div class="bubble bubble-user">
+            <p class="bubble-text">{{ msg.content }}</p>
+          </div>
+        </div>
+      } @else {
+        <div class="row row-assistant">
+          <div class="avatar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
+          <div class="bubble bubble-assistant">
+            @if (msg.streaming && msg.content === '') {
+              <div class="dots">
+                <span class="dot" style="animation-delay: 0ms"></span>
+                <span class="dot" style="animation-delay: 160ms"></span>
+                <span class="dot" style="animation-delay: 320ms"></span>
+              </div>
+            } @else {
+              <p class="bubble-text">{{ msg.content }}<span
+                  [class.cursor]="msg.streaming"
+                  [class.cursor-hidden]="!msg.streaming"></span></p>
+            }
+          </div>
+        </div>
+      }
+    }
+
+    @if (isLoading() && loadingStatus()) {
+      <div class="status-row">
+        <span class="status-pill">
+          <span class="status-spinner"></span>
+          {{ loadingStatus() }}
+        </span>
+      </div>
+    }
+  </div>
+
+  <!-- ── Input ───────────────────────────────────────────────────────── -->
+  <div class="input-bar">
+    <div class="input-inner">
+      <textarea
+        class="input-textarea"
+        placeholder="Ask a question about your documents…"
+        rows="1"
+        [value]="inputText"
+        (input)="onInput($event)"
+        (keydown)="onKeydown($event)"
+        [disabled]="isLoading()"
+      ></textarea>
+      <button
+        class="send-btn"
+        (click)="sendMessage()"
+        [disabled]="isLoading() || !inputText.trim()"
+        aria-label="Send"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <p class="input-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</p>
+  </div>
+</div>
+
