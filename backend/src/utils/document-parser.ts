@@ -2,9 +2,6 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { randomUUID } from 'crypto';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Parses raw document bytes into clean, readable plain text.
@@ -71,11 +68,12 @@ function detectFileType(content: Buffer, contentType: string, filename?: string)
 // ── PDF via pdfjs-dist ────────────────────────────────────────────────────────
 
 async function parsePDF(content: Buffer): Promise<string> {
-  // pdfjs-dist ships a legacy Node.js-compatible CJS build
+  // pdfjs-dist 4+ ships only ESM (.mjs) — use dynamic import, not require().
+  // The legacy build is more Node.js-friendly (no modern browser-only APIs).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js') as any;
+  const pdfjsLib = (await import('pdfjs-dist/legacy/build/pdf.mjs')) as any;
 
-  // Disable the worker (not available in Node.js)
+  // Disable the browser worker thread — not available in Node.js
   pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
   const uint8 = new Uint8Array(content);
