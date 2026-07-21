@@ -77,8 +77,25 @@ async function processDocument(
 
   // ── Step 4: Store embeddings in ChromaDB ──────────────────────────────────
   await job.updateProgress(75);
+
+  // Quality gate: discard chunks that are likely binary/structural noise.
+  // A meaningful chunk should have at least 20% alphabetic characters.
+  const MIN_ALPHA_RATIO = 0.20;
+  const MIN_CHUNK_LENGTH = 40;
+  const goodChunks = chunks.filter((c) => {
+    const text = c.pageContent;
+    if (text.length < MIN_CHUNK_LENGTH) return false;
+    const alphaCount = (text.match(/[a-zA-Z]/g) ?? []).length;
+    return alphaCount / text.length >= MIN_ALPHA_RATIO;
+  });
+
+  if (!goodChunks.length) {
+    throw new Error(`Document "${documentRef}" produced no usable text chunks after quality filtering.`);
+  }
+  console.log(`[Worker] ${goodChunks.length}/${chunks.length} chunks passed quality filter`);
+
   const vectorStore = await getVectorStore();
-  await vectorStore.addDocuments(chunks);
+  await vectorStore.addDocuments(goodChunks);
 
   // ── Step 5: Cleanup temp file (upload jobs only) ──────────────────────────
   if (job.data.source === 'upload') {
@@ -86,8 +103,8 @@ async function processDocument(
   }
 
   await job.updateProgress(100);
-  console.log(`[Worker] Stored ${chunks.length} chunks for documentRef=${documentRef}`);
-  return { documentRef, chunksStored: chunks.length };
+  console.log(`[Worker] Stored ${goodChunks.length} chunks for documentRef=${documentRef}`);
+  return { documentRef, chunksStored: goodChunks.length };
 }
 
 // ── Worker registration ───────────────────────────────────────────────────────
